@@ -3,6 +3,8 @@
 Init public repo from Sebastian Lague https://github.com/SebLague/Ecosystem-2/tree/master
 The Ecosystem Simulation video is available here https://youtu.be/r_It_X7v-1E
 
+![plot](./ecosystem.png)
+
 ## Explanation of the ecosystem
 
 The Ecosystem is composed of - Fox - Rabbit - Plants
