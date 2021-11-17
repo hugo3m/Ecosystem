@@ -5,7 +5,9 @@ namespace TerrainGeneration {
     [ExecuteInEditMode]
     public class TerrainGenerator : MonoBehaviour {
 
-        const string meshHolderName = "Terrain Mesh";
+        public GameObject TerrainMesh;
+        public Environment environment;
+        public GameObject currentTerrainMesh;
 
         public bool autoUpdate = true;
 
@@ -45,6 +47,7 @@ namespace TerrainGeneration {
         }
 
         public TerrainData Generate () {
+            currentTerrainMesh = Instantiate(TerrainMesh, this.transform, false);
             CreateMeshComponents ();
 
             int numTilesPerLine = Mathf.CeilToInt (worldSize);
@@ -68,10 +71,16 @@ namespace TerrainGeneration {
             numLandTiles = 0;
             numWaterTiles = 0;
 
+            var colors = new List<Color>();
+            Color[] startCols = { water.startCol, sand.startCol, grass.startCol };
+            Color[] endCols = { water.endCol, sand.endCol, grass.endCol };
+
             for (int y = 0; y < numTilesPerLine; y++) {
                 for (int x = 0; x < numTilesPerLine; x++) {
                     Vector2 uv = GetBiomeInfo (map[x, y], biomes);
-                    uvs.AddRange (new Vector2[] { uv, uv, uv, uv });
+                    // uvs.AddRange (new Vector2[] { uv, uv, uv, uv });  <-- not needed anymore
+                    var color = Color.Lerp(startCols[(int)uv.x], endCols[(int)uv.x], uv.y);
+                    colors.AddRange(new[] { color, color, color, color });
 
                     bool isWaterTile = uv.x == 0f;
                     bool isLandTile = !isWaterTile;
@@ -129,7 +138,8 @@ namespace TerrainGeneration {
                                 vertices.Add (tileVertices[edgeVertIndexB]);
                                 vertices.Add (tileVertices[edgeVertIndexB] + Vector3.down * depth);
 
-                                uvs.AddRange (new Vector2[] { uv, uv, uv, uv });
+                                // uvs.AddRange (new Vector2[] { uv, uv, uv, uv });
+                                colors.AddRange(new[] { color, color, color, color });
                                 int[] sideTriIndices = { vertIndex, vertIndex + 1, vertIndex + 2, vertIndex + 1, vertIndex + 3, vertIndex + 2 };
                                 triangles.AddRange (sideTriIndices);
                                 normals.AddRange (new Vector3[] { sideNormalsByDir[i], sideNormalsByDir[i], sideNormalsByDir[i], sideNormalsByDir[i] });
@@ -138,7 +148,7 @@ namespace TerrainGeneration {
                     }
 
                     // Terrain data:
-                    terrainData.tileCentres[x, y] = nw + new Vector3 (0.5f, 0, -0.5f);
+                    terrainData.tileCentres[x, y] = nw + new Vector3 (0.5f, 0, -0.5f) + this.environment.transform.position;
                     terrainData.walkable[x, y] = isLandTile;
                 }
             }
@@ -146,7 +156,8 @@ namespace TerrainGeneration {
             // Update mesh:
             mesh.SetVertices (vertices);
             mesh.SetTriangles (triangles, 0, true);
-            mesh.SetUVs (0, uvs);
+            // mesh.SetUVs (0, uvs);  <-- no longer needed
+            mesh.SetColors(colors);
             mesh.SetNormals (normals);
 
             meshRenderer.sharedMaterial = mat;
@@ -191,10 +202,10 @@ namespace TerrainGeneration {
             GameObject holder = null;
 
             if (meshFilter == null) {
-                if (GameObject.Find (meshHolderName)) {
-                    holder = GameObject.Find (meshHolderName);
+                if (currentTerrainMesh) {
+                    holder = currentTerrainMesh;
                 } else {
-                    holder = new GameObject (meshHolderName);
+                    holder = currentTerrainMesh;
                     holder.AddComponent<MeshRenderer> ();
                     holder.AddComponent<MeshFilter> ();
                 }
@@ -239,6 +250,11 @@ namespace TerrainGeneration {
                 walkable = new bool[size, size];
                 shore = new bool[size, size];
             }
+        }
+
+        private void OnDestroy()
+        {
+            Destroy(currentTerrainMesh);
         }
     }
 }

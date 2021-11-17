@@ -7,7 +7,21 @@ public class Environment : MonoBehaviour {
 
     const int mapRegionSize = 10;
 
-    public int seed;
+    private System.Random seed;
+
+    public float timeScale = 1;
+
+    [Header("State populations")]
+    public int bunny = 0;
+    public int plant = 0;
+    public int fox = 0;
+    public float moveSpeedBunny;
+    public float moveSpeedFox;
+    public float hungerResistanceBunny;
+    public float hungerResistanceFox;
+    public float thirstResistanceBunny;
+    public float thirstResistanceFox;
+
 
     [Header ("Trees")]
     public MeshRenderer treePrefab;
@@ -23,29 +37,44 @@ public class Environment : MonoBehaviour {
     public float mapViewDst;
 
     // Cached data:
-    public static Vector3[, ] tileCentres;
-    public static bool[, ] walkable;
-    static int size;
-    static Coord[, ][] walkableNeighboursMap;
-    static List<Coord> walkableCoords;
+    public Vector3[, ] tileCentres;
+    public bool[, ] walkable;
+    int size;
+    Coord[, ][] walkableNeighboursMap;
+    List<Coord> walkableCoords;
 
-    static Dictionary<Species, List<Species>> preyBySpecies;
-    static Dictionary<Species, List<Species>> predatorsBySpecies;
+    Dictionary<Species, List<Species>> preyBySpecies;
+    Dictionary<Species, List<Species>> predatorsBySpecies;
 
     // array of visible tiles from any tile; value is Coord.invalid if no visible water tile
-    static Coord[, ] closestVisibleWaterMap;
+    Coord[, ] closestVisibleWaterMap;
 
-    static System.Random prng;
-    TerrainGenerator.TerrainData terrainData;
+    System.Random prng;
+    public TerrainGenerator.TerrainData terrainData;
+    public TerrainGenerator PrefabTerrainGenerator;
+    public TerrainGenerator currentTerrainGenerator;
+    public Dictionary<Species, Map> speciesMaps;
+    public EnvironmentUtility environmentUtility;
+    public GameObject TreeHolderPrefab;
 
-    static Dictionary<Species, Map> speciesMaps;
+    private bool end;
 
-    void Start () {
+    public void StartByManager () {
+        Time.timeScale = timeScale;
         prng = new System.Random ();
+        seed = new System.Random(0);
+
+        environmentUtility = new EnvironmentUtility(this);
 
         Init ();
         SpawnInitialPopulations ();
+        StartCoroutine(SpawnNewPlantRandomly());
 
+    }
+
+    private void OnDestroy()
+    {
+        Destroy(currentTerrainGenerator);
     }
 
     void OnDrawGizmos () {
@@ -59,15 +88,27 @@ public class Environment : MonoBehaviour {
         */
     }
 
-    public static void RegisterMove (LivingEntity entity, Coord from, Coord to) {
+    public void RegisterMove (LivingEntity entity, Coord from, Coord to) {
         speciesMaps[entity.species].Move (entity, from, to);
     }
 
-    public static void RegisterDeath (LivingEntity entity) {
+    public void RegisterDeath (LivingEntity entity) {
         speciesMaps[entity.species].Remove (entity, entity.coord);
+        if (entity.species == Species.Bunny)
+        {
+            this.bunny--;
+        }
+        else if (entity.species == Species.Fox)
+        {
+            this.fox--;
+        }
+        else if (entity.species == Species.Plant)
+        {
+            this.plant--;
+        }
     }
 
-    public static Coord SenseWater (Coord coord) {
+    public Coord SenseWater (Coord coord) {
         var closestWaterCoord = closestVisibleWaterMap[coord.x, coord.y];
         if (closestWaterCoord != Coord.invalid) {
             float sqrDst = (tileCentres[coord.x, coord.y] - tileCentres[closestWaterCoord.x, closestWaterCoord.y]).sqrMagnitude;
@@ -78,12 +119,11 @@ public class Environment : MonoBehaviour {
         return Coord.invalid;
     }
 
-    public static LivingEntity SenseFood (Coord coord, Animal self, System.Func<LivingEntity, LivingEntity, int> foodPreference) {
+    public LivingEntity SenseFood (Coord coord, Animal self, System.Func<LivingEntity, LivingEntity, int> foodPreference) {
         var foodSources = new List<LivingEntity> ();
 
         List<Species> prey = preyBySpecies[self.species];
         for (int i = 0; i < prey.Count; i++) {
-
             Map speciesMap = speciesMaps[prey[i]];
 
             foodSources.AddRange (speciesMap.GetEntities (coord, Animal.maxViewDistance));
@@ -95,7 +135,7 @@ public class Environment : MonoBehaviour {
         // Return first visible food source
         for (int i = 0; i < foodSources.Count; i++) {
             Coord targetCoord = foodSources[i].coord;
-            if (EnvironmentUtility.TileIsVisibile (coord.x, coord.y, targetCoord.x, targetCoord.y)) {
+            if (environmentUtility.TileIsVisibile (coord.x, coord.y, targetCoord.x, targetCoord.y)) {
                 return foodSources[i];
             }
         }
@@ -104,7 +144,7 @@ public class Environment : MonoBehaviour {
     }
 
     // Return list of animals of the same species, with the opposite gender, who are also searching for a mate
-    public static List<Animal> SensePotentialMates (Coord coord, Animal self) {
+    public List<Animal> SensePotentialMates (Coord coord, Animal self) {
         Map speciesMap = speciesMaps[self.species];
         List<LivingEntity> visibleEntities = speciesMap.GetEntities (coord, Animal.maxViewDistance);
         var potentialMates = new List<Animal> ();
@@ -121,7 +161,7 @@ public class Environment : MonoBehaviour {
         return potentialMates;
     }
 
-    public static Surroundings Sense (Coord coord) {
+    public Surroundings Sense (Coord coord) {
         var closestPlant = speciesMaps[Species.Plant].ClosestEntity (coord, Animal.maxViewDistance);
         var surroundings = new Surroundings ();
         surroundings.nearestFoodSource = closestPlant;
@@ -130,7 +170,7 @@ public class Environment : MonoBehaviour {
         return surroundings;
     }
 
-    public static Coord GetNextTileRandom (Coord current) {
+    public Coord GetNextTileRandom (Coord current) {
         var neighbours = walkableNeighboursMap[current.x, current.y];
         if (neighbours.Length == 0) {
             return current;
@@ -139,7 +179,7 @@ public class Environment : MonoBehaviour {
     }
 
     /// Get random neighbour tile, weighted towards those in similar direction as currently facing
-    public static Coord GetNextTileWeighted (Coord current, Coord previous, double forwardProbability = 0.2, int weightingIterations = 3) {
+    public Coord GetNextTileWeighted (Coord current, Coord previous, double forwardProbability = 0.2, int weightingIterations = 3) {
 
         if (current == previous) {
 
@@ -186,8 +226,9 @@ public class Environment : MonoBehaviour {
     void Init () {
         var sw = System.Diagnostics.Stopwatch.StartNew ();
 
-        var terrainGenerator = FindObjectOfType<TerrainGenerator> ();
-        terrainData = terrainGenerator.Generate ();
+        currentTerrainGenerator = Instantiate(PrefabTerrainGenerator, this.transform, false);
+        currentTerrainGenerator.environment = this;
+        terrainData = currentTerrainGenerator.Generate ();
 
         tileCentres = terrainData.tileCentres;
         walkable = terrainData.walkable;
@@ -201,7 +242,7 @@ public class Environment : MonoBehaviour {
         speciesMaps = new Dictionary<Species, Map> ();
         for (int i = 0; i < numSpecies; i++) {
             Species species = (Species) (1 << i);
-            speciesMaps.Add (species, new Map (size, mapRegionSize));
+            speciesMaps.Add (species, new Map (size, mapRegionSize, this));
 
             preyBySpecies.Add (species, new List<Species> ());
             predatorsBySpecies.Add (species, new List<Species> ());
@@ -212,8 +253,9 @@ public class Environment : MonoBehaviour {
 
             if (initialPopulations[i].prefab is Animal) {
                 Animal hunter = (Animal) initialPopulations[i].prefab;
-                Species diet = hunter.diet;
-
+                Species diet = Species.Undefined;
+                if (hunter is Bunny) diet = Species.Plant;
+                if (hunter is Fox) diet = Species.Bunny;
                 for (int huntedSpeciesIndex = 0; huntedSpeciesIndex < numSpecies; huntedSpeciesIndex++) {
                     int bit = ((int) diet >> huntedSpeciesIndex) & 1;
                     // this bit of diet mask set (i.e. the hunter eats this species)
@@ -282,7 +324,7 @@ public class Environment : MonoBehaviour {
                         int targetY = y + viewOffsetsArr[i].y;
                         if (targetX >= 0 && targetX < size && targetY >= 0 && targetY < size) {
                             if (terrainData.shore[targetX, targetY]) {
-                                if (EnvironmentUtility.TileIsVisibile (x, y, targetX, targetY)) {
+                                if (environmentUtility.TileIsVisibile (x, y, targetX, targetY)) {
                                     closestVisibleWaterMap[x, y] = new Coord (targetX, targetY);
                                     foundWater = true;
                                     break;
@@ -296,7 +338,6 @@ public class Environment : MonoBehaviour {
                 }
             }
         }
-        Debug.Log ("Init time: " + sw.ElapsedMilliseconds);
     }
 
     void SpawnTrees () {
@@ -306,8 +347,9 @@ public class Environment : MonoBehaviour {
         float colVariationFactor = 0.15f;
         float minCol = .8f;
 
-        var spawnPrng = new System.Random (seed);
-        var treeHolder = new GameObject ("Tree holder").transform;
+        var spawnPrng = new System.Random (seed.Next(0,256));
+        var treeHolder = Instantiate(TreeHolderPrefab, this.transform, false).transform;
+        treeHolder.transform.SetParent(this.transform);
         walkableCoords = new List<Coord> ();
 
         for (int y = 0; y < terrainData.size; y++) {
@@ -328,7 +370,7 @@ public class Environment : MonoBehaviour {
                         float b = col + ((float) spawnPrng.NextDouble () * 2 - 1) * colVariationFactor;
 
                         // Spawn
-                        MeshRenderer tree = Instantiate (treePrefab, tileCentres[x, y], rot);
+                        MeshRenderer tree = Instantiate (treePrefab, tileCentres[x, y], rot, treeHolder.transform);
                         tree.transform.parent = treeHolder;
                         tree.transform.localScale = Vector3.one * scale;
                         tree.material.color = new Color (r, g, b);
@@ -345,7 +387,7 @@ public class Environment : MonoBehaviour {
 
     void SpawnInitialPopulations () {
 
-        var spawnPrng = new System.Random (seed);
+        var spawnPrng = new System.Random (seed.Next(0, 256));
         var spawnCoords = new List<Coord> (walkableCoords);
 
         foreach (var pop in initialPopulations) {
@@ -358,11 +400,82 @@ public class Environment : MonoBehaviour {
                 Coord coord = spawnCoords[spawnCoordIndex];
                 spawnCoords.RemoveAt (spawnCoordIndex);
 
-                var entity = Instantiate (pop.prefab);
-                entity.Init (coord);
+                var entity = Instantiate (pop.prefab, this.transform, false);
+                entity.Init (coord, this);
 
                 speciesMaps[entity.species].Add (entity, coord);
+
+                if(entity.species == Species.Bunny)
+                {
+                    bunny++;
+                } else if(entity.species == Species.Fox)
+                {
+                    fox++;
+                }
+                else if(entity.species == Species.Plant)
+                {
+                    plant++;
+                }
             }
+        }
+    }
+
+    public void SpawnNewPopulations(LivingEntity live, Coord coord)
+    {
+        Population pop;
+        if (live is Fox)
+        {
+            pop = initialPopulations[2];
+        }
+        else
+        {
+            pop = initialPopulations[0];
+        }
+        var entity = Instantiate(pop.prefab, this.transform, false);
+        entity.Init(coord, this);
+        speciesMaps[entity.species].Add(entity, coord);
+        if (entity.species == Species.Bunny)
+        {
+            bunny++;
+        }
+        else if (entity.species == Species.Fox)
+        {
+            fox++;
+        }
+        else if (entity.species == Species.Plant)
+        {
+            plant++;
+        }
+    }
+
+    public IEnumerator SpawnNewPlantRandomly()
+    {
+        while (true)
+        {
+            var spawnPrng = new System.Random(seed.Next(0, 256));
+            int numberNewPlant = spawnPrng.Next(0, bunny);
+            var spawnCoords = new List<Coord>(walkableCoords);
+            Population newPlant = initialPopulations[1];
+            
+            for (int i = 0; i < numberNewPlant; i++)
+            {
+                if (spawnCoords.Count == 0)
+                {
+                    Debug.Log("Ran out of empty tiles to spawn initial population");
+                    break;
+                }
+                int spawnCoordIndex = spawnPrng.Next(0, spawnCoords.Count);
+                Coord coord = spawnCoords[spawnCoordIndex];
+                spawnCoords.RemoveAt(spawnCoordIndex);
+
+                var entity = Instantiate(newPlant.prefab, this.transform, false);
+                entity.Init(coord, this);
+
+                speciesMaps[entity.species].Add(entity, coord);
+
+                plant++;
+            }
+            yield return new WaitForSeconds(Time.deltaTime * ((this.hungerResistanceBunny * this.thirstResistanceBunny) / (this.hungerResistanceBunny + this.thirstResistanceBunny)));
         }
     }
 

@@ -2,10 +2,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public static class EnvironmentUtility {
+public class EnvironmentUtility {
+
+    public Environment environment;
+
+    public EnvironmentUtility(Environment env)
+    {
+        environment = env;
+    }
 
     // returns true if unobstructed line of sight to target tile
-    public static bool TileIsVisibile (int x, int y, int x2, int y2) {
+    public bool TileIsVisibile (int x, int y, int x2, int y2) {
         // bresenham line algorithm
         int w = x2 - x;
         int h = y2 - y;
@@ -56,7 +63,7 @@ public static class EnvironmentUtility {
                 y += dy2;
             }
 
-            if (!Environment.walkable[x, y]) {
+            if (!environment.walkable[x, y]) {
                 return false;
             }
         }
@@ -64,7 +71,7 @@ public static class EnvironmentUtility {
     }
 
     // returns coords of tiles from given tile up to and including the target tile (null if path is obstructed)
-    public static Coord[] GetPath (int x, int y, int x2, int y2) {
+    public Coord[] GetPath (int x, int y, int x2, int y2) {
         // bresenham line algorithm
         int w = x2 - x;
         int h = y2 - y;
@@ -118,7 +125,7 @@ public static class EnvironmentUtility {
 
             // If not walkable, path is invalid so return null
             // (unless is target tile, which may be unwalkable e.g water)
-            if (i != longest && !Environment.walkable[x, y]) {
+            if (i != longest && !environment.walkable[x, y]) {
                 return null;
             }
             path[i - 1] = new Coord (x, y);

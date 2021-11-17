@@ -3,6 +3,7 @@
 public class LivingEntity : MonoBehaviour {
 
     public int colourMaterialIndex;
+    public Environment environment;
     public Species species;
     public Material material;
 
@@ -15,9 +16,13 @@ public class LivingEntity : MonoBehaviour {
 
     protected bool dead;
 
-    public virtual void Init (Coord coord) {
+    float amountRemaining = 1;
+    const float consumeSpeed = 8;
+
+    public virtual void Init (Coord coord, Environment env) {
+        this.environment = env;
         this.coord = coord;
-        transform.position = Environment.tileCentres[coord.x, coord.y];
+        transform.position = environment.tileCentres[coord.x, coord.y];
 
         // Set material to the instance material
         var meshRenderer = transform.GetComponentInChildren<MeshRenderer> ();
@@ -33,8 +38,14 @@ public class LivingEntity : MonoBehaviour {
     protected virtual void Die (CauseOfDeath cause) {
         if (!dead) {
             dead = true;
-            Environment.RegisterDeath (this);
+            environment.RegisterDeath (this);
             Destroy (gameObject);
         }
+    }
+
+    public virtual float Consume(float amount)
+    {
+        Die(CauseOfDeath.Eaten);
+        return 1;
     }
 }

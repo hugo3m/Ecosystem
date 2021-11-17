@@ -89,7 +89,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5835452083641406411}
-  - component: {fileID: 8985062361614467402}
+  - component: {fileID: 337159213961027944}
   m_Layer: 0
   m_Name: Fox
   m_TagString: Untagged
@@ -112,7 +112,7 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8985062361614467402
+--- !u!114 &337159213961027944
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -121,10 +121,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 7395166878686290392}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aa81e76bbb0534ab4a7eac5974e8565f, type: 3}
+  m_Script: {fileID: 11500000, guid: 4fab5cebb78d40445ba371bfeba094c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  colourMaterialIndex: 0
   species: 8
+  material: {fileID: 2100000, guid: 4f1aac096a6de4fa19b20fbb6e6c6e33, type: 2}
   coord:
     x: 0
     y: 0
@@ -132,7 +134,34 @@ MonoBehaviour:
   mapCoord:
     x: 0
     y: 0
-  diet: 4
+  diet: 0
   currentAction: 0
+  maleColour: {r: 0.8490566, g: 0.38454568, b: 0, a: 0}
+  femaleColour: {r: 0.8962264, g: 0.73149914, b: 0.48616055, a: 0}
+  moveArcHeight: 0.2
+  timeBetweenActionChoices: 1
+  animatingMovement: 0
+  moveFromCoord:
+    x: 0
+    y: 0
+  moveTargetCoord:
+    x: 0
+    y: 0
+  moveStartPos: {x: 0, y: 0, z: 0}
+  moveTargetPos: {x: 0, y: 0, z: 0}
+  moveTime: 0
+  moveSpeedFactor: 0
+  moveArcHeightFactor: 0
+  path: []
+  pathIndex: 0
+  foodTarget: {fileID: 5757730157557124530, guid: d3f6e322a0dcf4387b8220be9a32d2f2,
+    type: 3}
+  waterTarget:
+    x: 0
+    y: 0
+  lastActionChooseTime: 0
   hunger: 0
   thirst: 0
+  reproduction: 0
+  alreadyReproduced: 0
+  mateTarget: {fileID: 0}

@@ -10,8 +10,10 @@ public class Map {
     readonly int regionSize;
     readonly int numRegions;
     public int numEntities;
+    public Environment environment;
 
-    public Map (int size, int regionSize) {
+    public Map (int size, int regionSize, Environment env) {
+        environment = env;
         this.regionSize = regionSize;
         numRegions = Mathf.CeilToInt (size / (float) regionSize);
         map = new List<LivingEntity>[numRegions, numRegions];
@@ -40,7 +42,7 @@ public class Map {
                 LivingEntity entity = map[regionCoord.x, regionCoord.y][j];
                 float sqrDst = Coord.SqrDistance (entity.coord, origin);
                 if (sqrDst < sqrViewDst) {
-                    if (EnvironmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) {
+                    if (environment.environmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) {
                         visibleEntities.Add (entity);
                     }
                 }
@@ -68,7 +70,7 @@ public class Map {
                 LivingEntity entity = map[regionCoord.x, regionCoord.y][j];
                 float sqrDst = Coord.SqrDistance (entity.coord, origin);
                 if (sqrDst < closestSqrDst) {
-                    if (EnvironmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) {
+                    if (environment.environmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) {
                         closestSqrDst = sqrDst;
                         closestEntity = entity;
                     }
@@ -162,7 +164,7 @@ public class Map {
         // Settings:
         bool showViewedRegions = true;
         bool showOccupancy = false;
-        float height = Environment.tileCentres[0, 0].y + 0.1f;
+        float height = environment.tileCentres[0, 0].y + 0.1f;
         Gizmos.color = Color.black;
 
         // Draw:
